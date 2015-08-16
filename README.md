@@ -3,7 +3,7 @@
 A Fast and Flexible Static Site Generator built with love by [spf13](http://spf13.com/) and [friends](https://github.com/spf13/hugo/graphs/contributors) in [Go][].
 
 [Website](http://gohugo.io) |
-[Forum](https://discuss.gohugo.io) |
+[Forum](http://discuss.gohugo.io) |
 [Chat](https://gitter.im/spf13/hugo) |
 [Documentation](http://gohugo.io/overview/introduction/) |
 [Installation Guide](http://gohugo.io/overview/installing/) |
@@ -96,11 +96,12 @@ We welcome your contributions. To make the process as seamless as possible, we a
 
 * Go ahead and fork the project and make your changes. We encourage pull requests to discuss code changes.
 * When you’re ready to create a pull request, be sure to:
+     * Sign the [Forum Release thread](http://discuss.gohugo.io/t/switching-to-apache-2-license/173/26)
      * Have test cases for the new code. If you have questions about how to do it, please ask in your pull request.
      * Run `go fmt`
      * Squash your commits into a single commit. `git rebase -i`. It’s okay to force update your pull request.
      * This [blog article](http://chris.beams.io/posts/git-commit/) is a good resource for learning how to write good commit messages, the most important part being that each commit message should have a title/subject in imperative mode without trailing period: *"Return error on wrong use of the Paginator"*, **NOT** *"Returning some error."* Also, if your commit references one or more GitHub issues, always end your commit message body with *See #1234* or *Fixes #1234*. Replace *1234* with the GitHub issue ID. The last example will close the issue when the commit is merged into *master*.
-     * Make sure `go test ./...` passes, and `go build` completes. Our [Travis CI loop](https://travis-ci.org/spf13/hugo) (Linux) and [AppVeyor](https://ci.appveyor.com/project/spf13/hugo/branch/master) (Windows) will catch most things that are missing. 
+     * Make sure `go test ./...` passes, and `go build` completes. Our [Travis CI loop](https://travis-ci.org/spf13/hugo) (Linux) and [AppVeyor](https://ci.appveyor.com/project/spf13/hugo/branch/master) (Windows) will catch most things that are missing.
 
 ### Building Hugo with Your Changes
 

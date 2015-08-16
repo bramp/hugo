@@ -66,7 +66,9 @@ type Page struct {
 	contentShortCodes   map[string]string
 	plain               string // TODO should be []byte
 	plainWords          []string
+	plainRuneCount      int
 	plainInit           sync.Once
+	plainSecondaryInit  sync.Once
 	renderingConfig     *helpers.Blackfriday
 	renderingConfigInit sync.Once
 	PageMeta
@@ -108,10 +110,31 @@ func (p *Page) PlainWords() []string {
 	return p.plainWords
 }
 
+// RuneCount returns the rune count, excluding any whitespace, of the plain content.
+func (p *Page) RuneCount() int {
+	p.initPlainSecondary()
+	return p.plainRuneCount
+}
+
 func (p *Page) initPlain() {
 	p.plainInit.Do(func() {
 		p.plain = helpers.StripHTML(string(p.Content))
 		p.plainWords = strings.Fields(p.plain)
+		return
+	})
+}
+
+func (p *Page) initPlainSecondary() {
+	p.plainSecondaryInit.Do(func() {
+		p.initPlain()
+		runeCount := 0
+		for _, r := range p.plain {
+			if !helpers.IsWhitespace(r) {
+				runeCount++
+			}
+		}
+		p.plainRuneCount = runeCount
+		return
 	})
 }
 
@@ -520,7 +543,9 @@ func (p *Page) update(f interface{}) error {
 				case []interface{}:
 					if len(vvv) > 0 {
 						switch vvv[0].(type) {
-						case map[interface{}]interface{}: // Proper parsing structured array from yaml based FrontMatter
+						case map[interface{}]interface{}: // Proper parsing structured array from YAML based FrontMatter
+							p.Params[loki] = vvv
+						case map[string]interface{}: // Proper parsing structured array from JSON based FrontMatter
 							p.Params[loki] = vvv
 						default:
 							a := make([]string, len(vvv))
@@ -603,6 +628,9 @@ func (p *Page) HasMenuCurrent(menu string, me *MenuEntry) bool {
 				if child.IsEqual(m) {
 					return true
 				}
+				if p.HasMenuCurrent(menu, child) {
+					return true
+				}
 			}
 		}
 	}
@@ -676,13 +704,15 @@ func (p *Page) Menus() PageMenus {
 }
 
 func (p *Page) Render(layout ...string) template.HTML {
-	curLayout := ""
+	var l []string
 
 	if len(layout) > 0 {
-		curLayout = layout[0]
+		l = layouts(p.Type(), layout[0])
+	} else {
+		l = p.Layout()
 	}
 
-	return tpl.ExecuteTemplateToHTML(p, p.Layout(curLayout)...)
+	return tpl.ExecuteTemplateToHTML(p, l...)
 }
 
 func (p *Page) guessMarkupType() string {

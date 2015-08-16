@@ -82,6 +82,9 @@ func New() Template {
 
 	localTemplates = &templates.Template
 
+	for k, v := range funcMap {
+		amber.FuncMap[k] = v
+	}
 	templates.Funcs(funcMap)
 	templates.LoadEmbedded()
 	return templates
@@ -190,13 +193,14 @@ func (t *GoHTMLTemplate) AddTemplateFile(name, baseTemplatePath, path string) er
 	ext := filepath.Ext(path)
 	switch ext {
 	case ".amber":
+		templateName := strings.TrimSuffix(name, filepath.Ext(name)) + ".html"
 		compiler := amber.New()
 		// Parse the input file
 		if err := compiler.ParseFile(path); err != nil {
-			return nil
+			return err
 		}
 
-		if _, err := compiler.CompileWithTemplate(t.New(name)); err != nil {
+		if _, err := compiler.CompileWithTemplate(t.New(templateName)); err != nil {
 			return err
 		}
 	case ".ace":

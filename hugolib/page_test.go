@@ -1,9 +1,11 @@
 package hugolib
 
 import (
+	"fmt"
 	"html/template"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +140,16 @@ title: Simple
 Summary Same Line<!--more-->
 
 Some more text
+`
+
+	SIMPLE_PAGE_WITH_FIVE_MULTIBYTE_UFT8_RUNES = `---
+title: Simple
+---
+
+
+€ € € € €
+
+
 `
 
 	SIMPLE_PAGE_WITH_LONG_CONTENT = `---
@@ -279,6 +291,104 @@ a_date = 1979-05-27T07:32:00Z
 a_key = "a_value"
 +++
 Front Matter with various frontmatter types`
+
+var PAGE_WITH_CALENDAR_YAML_FRONTMATTER = `---
+type: calendar
+weeks:
+  -
+    start: "Jan 5"
+    days:
+      - activity: class
+        room: EN1000
+      - activity: lab
+      - activity: class
+      - activity: lab
+      - activity: class
+  -
+    start: "Jan 12"
+    days:
+      - activity: class
+      - activity: lab
+      - activity: class
+      - activity: lab
+      - activity: exam
+---
+
+Hi.
+`
+
+var PAGE_WITH_CALENDAR_JSON_FRONTMATTER = `{
+  "type": "calendar",
+  "weeks": [
+    {
+      "start": "Jan 5",
+      "days": [
+        { "activity": "class", "room": "EN1000" },
+        { "activity": "lab" },
+        { "activity": "class" },
+        { "activity": "lab" },
+        { "activity": "class" }
+      ]
+    },
+    {
+      "start": "Jan 12",
+      "days": [
+        { "activity": "class" },
+        { "activity": "lab" },
+        { "activity": "class" },
+        { "activity": "lab" },
+        { "activity": "exam" }
+      ]
+    }
+  ]
+}
+
+Hi.
+`
+
+var PAGE_WITH_CALENDAR_TOML_FRONTMATTER = `+++
+type = "calendar"
+
+[[weeks]]
+start = "Jan 5"
+
+[[weeks.days]]
+activity = "class"
+room = "EN1000"
+
+[[weeks.days]]
+activity = "lab"
+
+[[weeks.days]]
+activity = "class"
+
+[[weeks.days]]
+activity = "lab"
+
+[[weeks.days]]
+activity = "class"
+
+[[weeks]]
+start = "Jan 12"
+
+[[weeks.days]]
+activity = "class"
+
+[[weeks.days]]
+activity = "lab"
+
+[[weeks.days]]
+activity = "class"
+
+[[weeks.days]]
+activity = "lab"
+
+[[weeks.days]]
+activity = "exam"
++++
+
+Hi.
+`
 
 func checkError(t *testing.T, err error, expected string) {
 	if err == nil {
@@ -470,6 +580,21 @@ func TestPageWithDate(t *testing.T) {
 	checkPageDate(t, p, d)
 }
 
+func TestRuneCount(t *testing.T) {
+	p, _ := NewPage("simple.md")
+	_, err := p.ReadFrom(strings.NewReader(SIMPLE_PAGE_WITH_FIVE_MULTIBYTE_UFT8_RUNES))
+	p.Convert()
+	p.analyzePage()
+	if err != nil {
+		t.Fatalf("Unable to create a page with frontmatter and body content: %s", err)
+	}
+
+	if p.RuneCount() != 5 {
+		t.Fatalf("incorrect rune count for content '%s'. expected %v, got %v", p.plain, 5, p.RuneCount())
+
+	}
+}
+
 func TestWordCount(t *testing.T) {
 	p, _ := NewPage("simple.md")
 	_, err := p.ReadFrom(strings.NewReader(SIMPLE_PAGE_WITH_LONG_CONTENT))
@@ -547,6 +672,22 @@ func TestShouldRenderContent(t *testing.T) {
 			t.Errorf("expected p.IsRenderable() == %t, got %t", test.render, p.IsRenderable())
 		}
 	}
+}
+
+// Issue #768
+func TestCalendarParamsVariants(t *testing.T) {
+	pageJSON, _ := NewPage("test/fileJSON.md")
+	_, _ = pageJSON.ReadFrom(strings.NewReader(PAGE_WITH_CALENDAR_JSON_FRONTMATTER))
+
+	pageYAML, _ := NewPage("test/fileYAML.md")
+	_, _ = pageYAML.ReadFrom(strings.NewReader(PAGE_WITH_CALENDAR_YAML_FRONTMATTER))
+
+	pageTOML, _ := NewPage("test/fileTOML.md")
+	_, _ = pageTOML.ReadFrom(strings.NewReader(PAGE_WITH_CALENDAR_TOML_FRONTMATTER))
+
+	assert.True(t, compareObjects(pageJSON.Params, pageYAML.Params))
+	assert.True(t, compareObjects(pageJSON.Params, pageTOML.Params))
+
 }
 
 func TestDifferentFrontMatterVarTypes(t *testing.T) {
@@ -725,4 +866,15 @@ func listEqual(left, right []string) bool {
 	}
 
 	return true
+}
+
+// TODO(bep) this may be useful for other tests.
+func compareObjects(a interface{}, b interface{}) bool {
+	aStr := strings.Split(fmt.Sprintf("%v", a), "")
+	sort.Strings(aStr)
+
+	bStr := strings.Split(fmt.Sprintf("%v", b), "")
+	sort.Strings(bStr)
+
+	return strings.Join(aStr, "") == strings.Join(bStr, "")
 }

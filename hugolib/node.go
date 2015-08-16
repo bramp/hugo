@@ -14,7 +14,6 @@
 package hugolib
 
 import (
-	"github.com/spf13/hugo/helpers"
 	"html/template"
 	"sync"
 	"time"
@@ -49,6 +48,9 @@ func (n *Node) HasMenuCurrent(menuID string, inme *MenuEntry) bool {
 
 		for _, child := range inme.Children {
 			if me.IsSameResource(child) {
+				return true
+			}
+			if n.HasMenuCurrent(menuID, child) {
 				return true
 			}
 		}
@@ -128,24 +130,6 @@ type URLPath struct {
 	Permalink template.HTML
 	Slug      string
 	Section   string
-}
-
-// Url is deprecated. Will be removed in 0.15.
-func (n *Node) Url() string {
-	helpers.Deprecated("Node", ".Url", ".URL")
-	return n.URL
-}
-
-// UrlPath is deprecated. Will be removed in 0.15.
-func (n *Node) UrlPath() URLPath {
-	helpers.Deprecated("Node", ".UrlPath", ".URLPath")
-	return n.URLPath
-}
-
-// Url is deprecated. Will be removed in 0.15.
-func (up URLPath) Url() string {
-	helpers.Deprecated("URLPath", ".Url", ".URL")
-	return up.URL
 }
 
 // Scratch returns the writable context associated with this Node.

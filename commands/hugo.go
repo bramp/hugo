@@ -43,11 +43,12 @@ import (
 var HugoCmd = &cobra.Command{
 	Use:   "hugo",
 	Short: "hugo builds your site",
-	Long: `hugo is the main command, used to build your Hugo site. 
-	
-Hugo is a Fast and Flexible Static Site Generator built with love by spf13 and friends in Go.
+	Long: `hugo is the main command, used to build your Hugo site.
 
-Complete documentation is available at http://gohugo.io`,
+Hugo is a Fast and Flexible Static Site Generator
+built with love by spf13 and friends in Go.
+
+Complete documentation is available at http://gohugo.io/.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		InitializeConfig()
 		build()
@@ -110,9 +111,8 @@ func init() {
 
 	// for Bash autocomplete
 	validConfigFilenames := []string{"json", "js", "yaml", "yml", "toml", "tml"}
-	annotation := make(map[string][]string)
-	annotation[cobra.BashCompFilenameExt] = validConfigFilenames
-	HugoCmd.PersistentFlags().Lookup("config").Annotations = annotation
+	HugoCmd.PersistentFlags().SetAnnotation("config", cobra.BashCompFilenameExt, validConfigFilenames)
+	HugoCmd.PersistentFlags().SetAnnotation("theme", cobra.BashCompSubdirsInDir, []string{"themes"})
 
 	// This message will be shown to Windows users if Hugo is opened from explorer.exe
 	cobra.MousetrapHelpText = `
@@ -279,7 +279,15 @@ func InitializeConfig() {
 
 	jww.INFO.Println("Using config file:", viper.ConfigFileUsed())
 
+	themeDir := helpers.GetThemeDir()
+	if themeDir != "" {
+		if _, err := os.Stat(themeDir); os.IsNotExist(err) {
+			jww.FATAL.Fatalln("Unable to find theme Directory:", themeDir)
+		}
+	}
+
 	themeVersionMismatch, minVersion := helpers.IsThemeVsHugoVersionMismatch()
+
 	if themeVersionMismatch {
 		jww.ERROR.Printf("Current theme does not support Hugo version %s. Minimum version required is %s\n",
 			helpers.HugoReleaseVersion(), minVersion)
@@ -336,10 +344,16 @@ func copyStatic() error {
 func getDirList() []string {
 	var a []string
 	dataDir := helpers.AbsPathify(viper.GetString("DataDir"))
+	layoutDir := helpers.AbsPathify(viper.GetString("LayoutDir"))
 	walker := func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			if path == dataDir && os.IsNotExist(err) {
 				jww.WARN.Println("Skip DataDir:", err)
+				return nil
+
+			}
+			if path == layoutDir && os.IsNotExist(err) {
+				jww.WARN.Println("Skip LayoutDir:", err)
 				return nil
 
 			}

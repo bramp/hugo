@@ -132,24 +132,6 @@ type SiteInfo struct {
 // linkedin
 type SiteSocial map[string]string
 
-// BaseUrl is deprecated. Will be removed in 0.15.
-func (s *SiteInfo) BaseUrl() template.URL {
-	helpers.Deprecated("Site", ".BaseUrl", ".BaseURL")
-	return s.BaseURL
-}
-
-// Recent is deprecated. Will be removed in 0.15.
-func (s *SiteInfo) Recent() *Pages {
-	helpers.Deprecated("Site", ".Recent", ".Pages")
-	return s.Pages
-}
-
-// Indexes is deprecated. Will be removed in 0.15.
-func (s *SiteInfo) Indexes() *TaxonomyList {
-	helpers.Deprecated("Site", ".Indexes", ".Taxonomies")
-	return &s.Taxonomies
-}
-
 func (s *SiteInfo) GetParam(key string) interface{} {
 	v := s.Params[strings.ToLower(key)]
 
@@ -1095,7 +1077,14 @@ func taxonomyRenderer(s *Site, taxes <-chan taxRenderInfo, results chan<- error,
 
 		n, base = s.newTaxonomyNode(t)
 
-		if err := s.renderAndWritePage("taxononomy "+t.singular, base, n, layouts...); err != nil {
+		dest := base
+		if viper.GetBool("UglyURLs") {
+			dest = helpers.Uglify(base + ".html")
+		} else {
+			dest = helpers.PrettifyPath(base + "/index.html")
+		}
+
+		if err := s.renderAndWritePage("taxonomy "+t.singular, dest, n, layouts...); err != nil {
 			results <- err
 			continue
 		}
@@ -1118,12 +1107,13 @@ func taxonomyRenderer(s *Site, taxes <-chan taxRenderInfo, results chan<- error,
 				taxonomyPagerNode, _ := s.newTaxonomyNode(t)
 				taxonomyPagerNode.paginator = pager
 				if pager.TotalPages() > 0 {
-					taxonomyPagerNode.Date = pager.Pages()[0].Date
-					taxonomyPagerNode.Lastmod = pager.Pages()[0].Lastmod
+					first, _ := pager.page(0)
+					taxonomyPagerNode.Date = first.Date
+					taxonomyPagerNode.Lastmod = first.Lastmod
 				}
 				pageNumber := i + 1
 				htmlBase := fmt.Sprintf("/%s/%s/%d", base, paginatePath, pageNumber)
-				if err := s.renderAndWritePage(fmt.Sprintf("taxononomy %s", t.singular), htmlBase, taxonomyPagerNode, layouts...); err != nil {
+				if err := s.renderAndWritePage(fmt.Sprintf("taxonomy %s", t.singular), htmlBase, taxonomyPagerNode, layouts...); err != nil {
 					results <- err
 					continue
 				}
@@ -1224,8 +1214,9 @@ func (s *Site) RenderSectionLists() error {
 				sectionPagerNode := s.newSectionListNode(sectionName, section, data)
 				sectionPagerNode.paginator = pager
 				if pager.TotalPages() > 0 {
-					sectionPagerNode.Date = pager.Pages()[0].Date
-					sectionPagerNode.Lastmod = pager.Pages()[0].Lastmod
+					first, _ := pager.page(0)
+					sectionPagerNode.Date = first.Date
+					sectionPagerNode.Lastmod = first.Lastmod
 				}
 				pageNumber := i + 1
 				htmlBase := fmt.Sprintf("/%s/%s/%d", section, paginatePath, pageNumber)
@@ -1283,8 +1274,9 @@ func (s *Site) RenderHomePage() error {
 			homePagerNode := s.newHomeNode()
 			homePagerNode.paginator = pager
 			if pager.TotalPages() > 0 {
-				homePagerNode.Date = pager.Pages()[0].Date
-				homePagerNode.Lastmod = pager.Pages()[0].Lastmod
+				first, _ := pager.page(0)
+				homePagerNode.Date = first.Date
+				homePagerNode.Lastmod = first.Lastmod
 			}
 			pageNumber := i + 1
 			htmlBase := fmt.Sprintf("/%s/%d", paginatePath, pageNumber)
@@ -1320,6 +1312,7 @@ func (s *Site) RenderHomePage() error {
 	n.IsHome = false
 	n.Title = "404 Page not found"
 	n.Permalink = s.permalink("404.html")
+	n.scratch = newScratch()
 
 	nfLayouts := []string{"404.html"}
 	if nfErr := s.renderAndWritePage("404 page", "404.html", n, s.appendThemeTemplates(nfLayouts)...); nfErr != nil {
@@ -1601,9 +1594,9 @@ func (s *Site) futureStats() string {
 
 	switch s.futureCount {
 	case 0:
-		return "0 future content "
+		return "0 future content"
 	case 1:
-		msg = "1 future rendered "
+		msg = "1 future rendered"
 	default:
 		msg = fmt.Sprintf("%d future rendered", s.draftCount)
 	}
