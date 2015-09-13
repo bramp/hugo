@@ -51,10 +51,10 @@ func TestCodeFence(t *testing.T) {
 		input, expected string
 	}
 	data := []test{
+		// TODO(bramp) Merge conflict, unsure which of the following to use:
 		{true, "<html></html>", "<div class=\"highlight\"><pre><code class=\"language-html\" data-lang=\"html\"><span class=\"nt\">&lt;html&gt;&lt;/html&gt;</span>\n</code></pre></div>\n"},
-		{false, "<html></html>", "<pre><code class=\"language-html\">&lt;html&gt;&lt;/html&gt;</code></pre>\n"},
-		// TODO(bramp) Merge conflict, unsure which to use, above or below
-		{true,  "<html></html>", "<div class=\"highlight\"><pre><span class=\"nt\">&lt;html&gt;&lt;/html&gt;</span>\n</pre></div>\n"},
+		{true, "<html></html>", "<div class=\"highlight\"><pre><span class=\"nt\">&lt;html&gt;&lt;/html&gt;</span>\n</pre></div>\n"},
+
 		{false, "<html></html>", "<pre><code class=\"language-html\">&lt;html&gt;&lt;/html&gt;</code></pre>\n"},
 	}
 
