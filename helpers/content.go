@@ -177,7 +177,6 @@ func GetHTMLRenderer(defaultFlags int, ctx *RenderingContext) blackfriday.Render
 	}
 }
 
-
 func getMarkdownExtensions(ctx *RenderingContext) int {
 	flags := 0 | blackfriday.EXTENSION_NO_INTRA_EMPHASIS |
 		blackfriday.EXTENSION_TABLES | blackfriday.EXTENSION_FENCED_CODE |
