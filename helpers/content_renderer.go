@@ -7,7 +7,6 @@ import (
 	"github.com/miekg/mmark"
 	"github.com/russross/blackfriday"
 	"github.com/spf13/viper"
-	"github.com/miekg/mmark"
 )
 
 // Wraps a blackfriday.Renderer, typically a blackfriday.Html
