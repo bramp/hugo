@@ -30,20 +30,20 @@ in Hugo and is used as the [section](/content/sections/).
         ├── post
         |   ├── firstpost.md   // <- http://1.com/post/firstpost/
         |   ├── happy
-        |   |   └── ness.ad  // <- http://1.com/post/happy/ness/
+        |   |   └── ness.md  // <- http://1.com/post/happy/ness/
         |   └── secondpost.md  // <- http://1.com/post/secondpost/
         └── quote
             ├── first.md       // <- http://1.com/quote/first/
             └── second.md      // <- http://1.com/quote/second/
 
-**Here's the same organization run with `hugo --uglyUrls`**
+**Here's the same organization run with `hugo --uglyURLs`**
 
     .
     └── content
         ├── post
         |   ├── firstpost.md   // <- http://1.com/post/firstpost.html
         |   ├── happy
-        |   |   └── ness.ad    // <- http://1.com/post/happy/ness.html
+        |   |   └── ness.md    // <- http://1.com/post/happy/ness.html
         |   └── secondpost.md  // <- http://1.com/post/secondpost.html
         └── quote
             ├── first.md       // <- http://1.com/quote/first.html
@@ -76,8 +76,10 @@ The actual path to the file on disk. Destination will create the destination
 with the same path. Includes [section](/content/sections/).
 
 ### section
-`section` can be provided in the front matter overriding the section derived from
-the source content location on disk. See [section](/content/sections/).
+`section` is determined by its location on disk and can *not* be specified in the front matter. See [section](/content/sections/).
+
+### type
+`type` is also determined by its location on disk but, unlike `section`, it *can* be specified in the front matter. See [type](/content/types/).
 
 ### path
 `path` can be provided in the front matter. This will replace the actual
@@ -88,7 +90,7 @@ path. Includes [section](/content/sections/).
 A complete URL can be provided. This will override all the above as it pertains
 to the end destination. This must be the path from the baseURL (starting with a "/").
 When a `url` is provided, it will be used exactly. Using `url` will ignore the
-`--uglyUrls` setting.
+`--uglyURLs` setting.
 
 
 ## Path breakdown in Hugo

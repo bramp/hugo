@@ -1,9 +1,9 @@
-// Copyright © 2014 Steve Francia <spf@spf13.com>.
+// Copyright 2015 The Hugo Authors. All rights reserved.
 //
-// Licensed under the Simple Public License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// http://opensource.org/licenses/Simple-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,9 +21,12 @@ import (
 	"bytes"
 	"html/template"
 	"os/exec"
+	"unicode/utf8"
 
 	"github.com/miekg/mmark"
+	"github.com/mitchellh/mapstructure"
 	"github.com/russross/blackfriday"
+	"github.com/spf13/cast"
 	bp "github.com/spf13/hugo/bufferpool"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
@@ -44,22 +47,40 @@ type Blackfriday struct {
 	AngledQuotes    bool
 	Fractions       bool
 	HrefTargetBlank bool
+	SmartDashes     bool
 	LatexDashes     bool
 	PlainIDAnchors  bool
 	Extensions      []string
 	ExtensionsMask  []string
 }
 
-// NewBlackfriday creates a new Blackfriday with some sane defaults.
+// NewBlackfriday creates a new Blackfriday filled with site config or some sane defaults
 func NewBlackfriday() *Blackfriday {
-	return &Blackfriday{
-		Smartypants:     true,
-		AngledQuotes:    false,
-		Fractions:       true,
-		HrefTargetBlank: false,
-		LatexDashes:     true,
-		PlainIDAnchors:  false,
+	combinedParam := map[string]interface{}{
+		"smartypants":     true,
+		"angledQuotes":    false,
+		"fractions":       true,
+		"hrefTargetBlank": false,
+		"smartDashes":     true,
+		"latexDashes":     true,
+		"plainIDAnchors":  false,
 	}
+
+	siteParam := viper.GetStringMap("blackfriday")
+	if siteParam != nil {
+		siteConfig := cast.ToStringMap(siteParam)
+
+		for key, value := range siteConfig {
+			combinedParam[key] = value
+		}
+	}
+
+	combinedConfig := &Blackfriday{}
+	if err := mapstructure.Decode(combinedParam, combinedConfig); err != nil {
+		jww.FATAL.Printf("Failed to get site rendering config\n%s", err.Error())
+	}
+
+	return combinedConfig
 }
 
 var blackfridayExtensionMap = map[string]int{
@@ -168,6 +189,10 @@ func GetHTMLRenderer(defaultFlags int, ctx *RenderingContext) blackfriday.Render
 		htmlFlags |= blackfriday.HTML_HREF_TARGET_BLANK
 	}
 
+	if ctx.getConfig().SmartDashes {
+		htmlFlags |= blackfriday.HTML_SMARTYPANTS_DASHES
+	}
+
 	if ctx.getConfig().LatexDashes {
 		htmlFlags |= blackfriday.HTML_SMARTYPANTS_LATEX_DASHES
 	}
@@ -176,7 +201,6 @@ func GetHTMLRenderer(defaultFlags int, ctx *RenderingContext) blackfriday.Render
 		blackfriday.HtmlRendererWithParameters(htmlFlags, "", "", renderParameters),
 	}
 }
-
 
 func getMarkdownExtensions(ctx *RenderingContext) int {
 	flags := 0 | blackfriday.EXTENSION_NO_INTRA_EMPHASIS |
@@ -226,7 +250,9 @@ func GetMmarkHtmlRenderer(defaultFlags int, ctx *RenderingContext) mmark.Rendere
 	htmlFlags := defaultFlags
 	htmlFlags |= mmark.HTML_FOOTNOTE_RETURN_LINKS
 
-	return mmark.HtmlRendererWithParameters(htmlFlags, "", "", renderParameters)
+	return &HugoMmarkHtmlRenderer{
+		mmark.HtmlRendererWithParameters(htmlFlags, "", "", renderParameters),
+	}
 }
 
 func GetMmarkExtensions(ctx *RenderingContext) int {
@@ -380,6 +406,32 @@ func TruncateWords(s string, max int) string {
 	}
 
 	return strings.Join(words[:max], " ")
+}
+
+func TruncateWordsByRune(words []string, max int) (string, bool) {
+	count := 0
+	for index, word := range words {
+		if count >= max {
+			return strings.Join(words[:index], " "), true
+		}
+		runeCount := utf8.RuneCountInString(word)
+		if len(word) == runeCount {
+			count++
+		} else if count+runeCount < max {
+			count += runeCount
+		} else {
+			for ri, _ := range word {
+				if count >= max {
+					truncatedWords := append(words[:index], word[:ri])
+					return strings.Join(truncatedWords, " "), true
+				} else {
+					count++
+				}
+			}
+		}
+	}
+
+	return strings.Join(words, " "), false
 }
 
 // TruncateWordsToWholeSentence takes content and an int

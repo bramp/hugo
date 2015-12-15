@@ -1,9 +1,9 @@
-// Copyright © 2013-14 Steve Francia <spf@spf13.com>.
+// Copyright 2015 The Hugo Authors. All rights reserved.
 //
-// Licensed under the Simple Public License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// http://opensource.org/licenses/Simple-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@ package tpl
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html"
@@ -25,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"bitbucket.org/pkg/inflect"
 
 	"github.com/spf13/cast"
 	"github.com/spf13/hugo/helpers"
@@ -76,6 +79,21 @@ func Lt(a, b interface{}) bool {
 	return left < right
 }
 
+func Dictionary(values ...interface{}) (map[string]interface{}, error) {
+	if len(values)%2 != 0 {
+		return nil, errors.New("invalid dict call")
+	}
+	dict := make(map[string]interface{}, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return nil, errors.New("dict keys must be strings")
+		}
+		dict[key] = values[i+1]
+	}
+	return dict, nil
+}
+
 func compareGetFloat(a interface{}, b interface{}) (float64, float64) {
 	var left, right float64
 	var leftStr, rightStr *string
@@ -95,6 +113,11 @@ func compareGetFloat(a interface{}, b interface{}) (float64, float64) {
 			str := av.String()
 			leftStr = &str
 		}
+	case reflect.Struct:
+		switch av.Type() {
+		case timeType:
+			left = float64(timeUnix(av))
+		}
 	}
 
 	bv := reflect.ValueOf(b)
@@ -112,7 +135,11 @@ func compareGetFloat(a interface{}, b interface{}) (float64, float64) {
 			str := bv.String()
 			rightStr = &str
 		}
-
+	case reflect.Struct:
+		switch bv.Type() {
+		case timeType:
+			right = float64(timeUnix(bv))
+		}
 	}
 
 	switch {
@@ -313,6 +340,10 @@ func In(l interface{}, v interface{}) bool {
 	case reflect.Array, reflect.Slice:
 		for i := 0; i < lv.Len(); i++ {
 			lvv := lv.Index(i)
+			lvv, isNil := indirect(lvv)
+			if isNil {
+				continue
+			}
 			switch lvv.Kind() {
 			case reflect.String:
 				if vv.Type() == lvv.Type() && vv.String() == lvv.String() {
@@ -553,6 +584,16 @@ func checkCondition(v, mv reflect.Value, op string) (bool, error) {
 			return vIsNil == mvIsNil, nil
 		case "!=", "<>", "ne":
 			return vIsNil != mvIsNil, nil
+		}
+		return false, nil
+	}
+
+	if v.Kind() == reflect.Bool && mv.Kind() == reflect.Bool {
+		switch op {
+		case "", "=", "==", "eq":
+			return v.Bool() == mv.Bool(), nil
+		case "!=", "<>", "ne":
+			return v.Bool() != mv.Bool(), nil
 		}
 		return false, nil
 	}
@@ -1146,10 +1187,6 @@ func DateFormat(layout string, v interface{}) (string, error) {
 	return t.Format(layout), nil
 }
 
-func SafeHTML(text string) template.HTML {
-	return template.HTML(text)
-}
-
 // "safeHTMLAttr" is currently disabled, pending further discussion
 // on its use case.  2015-01-19
 func SafeHTMLAttr(text string) template.HTMLAttr {
@@ -1163,6 +1200,11 @@ func SafeCSS(text string) template.CSS {
 func SafeURL(text string) template.URL {
 	return template.URL(text)
 }
+
+func SafeHTML(a string) template.HTML { return template.HTML(a) }
+
+// SafeJS returns the given string as a template.JS type from html/template.
+func SafeJS(a string) template.JS { return template.JS(a) }
 
 func doArithmetic(a, b interface{}, op rune) (interface{}, error) {
 	av := reflect.ValueOf(a)
@@ -1317,60 +1359,103 @@ func ModBool(a, b interface{}) (bool, error) {
 	return res == int64(0), nil
 }
 
-func init() {
-	funcMap = template.FuncMap{
-		"urlize":      helpers.URLize,
-		"sanitizeURL": helpers.SanitizeURL,
-		"sanitizeurl": helpers.SanitizeURL,
-		"eq":          Eq,
-		"ne":          Ne,
-		"gt":          Gt,
-		"ge":          Ge,
-		"lt":          Lt,
-		"le":          Le,
-		"in":          In,
-		"slicestr":    Slicestr,
-		"substr":      Substr,
-		"split":       Split,
-		"intersect":   Intersect,
-		"isSet":       IsSet,
-		"isset":       IsSet,
-		"echoParam":   ReturnWhenSet,
-		"safeHTML":    SafeHTML,
-		"safeCSS":     SafeCSS,
-		"safeURL":     SafeURL,
-		"absURL":      func(a string) template.HTML { return template.HTML(helpers.AbsURL(a)) },
-		"relURL":      func(a string) template.HTML { return template.HTML(helpers.RelURL(a)) },
-		"markdownify": Markdownify,
-		"first":       First,
-		"last":        Last,
-		"after":       After,
-		"where":       Where,
-		"delimit":     Delimit,
-		"sort":        Sort,
-		"highlight":   Highlight,
-		"add":         func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '+') },
-		"sub":         func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '-') },
-		"div":         func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '/') },
-		"mod":         Mod,
-		"mul":         func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '*') },
-		"modBool":     ModBool,
-		"lower":       func(a string) string { return strings.ToLower(a) },
-		"upper":       func(a string) string { return strings.ToUpper(a) },
-		"title":       func(a string) string { return strings.Title(a) },
-		"partial":     Partial,
-		"ref":         Ref,
-		"relref":      RelRef,
-		"apply":       Apply,
-		"chomp":       Chomp,
-		"replace":     Replace,
-		"trim":        Trim,
-		"dateFormat":  DateFormat,
-		"getJSON":     GetJSON,
-		"getCSV":      GetCSV,
-		"readDir":     ReadDir,
-		"seq":         helpers.Seq,
-		"getenv":      func(varName string) string { return os.Getenv(varName) },
+func Base64Decode(content interface{}) (string, error) {
+	conv, err := cast.ToStringE(content)
+
+	if err != nil {
+		return "", err
 	}
 
+	dec, err := base64.StdEncoding.DecodeString(conv)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(dec), nil
+}
+
+func Base64Encode(content interface{}) (string, error) {
+	conv, err := cast.ToStringE(content)
+
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString([]byte(conv)), nil
+}
+
+func init() {
+	funcMap = template.FuncMap{
+		"urlize":       helpers.URLize,
+		"sanitizeURL":  helpers.SanitizeURL,
+		"sanitizeurl":  helpers.SanitizeURL,
+		"eq":           Eq,
+		"ne":           Ne,
+		"gt":           Gt,
+		"ge":           Ge,
+		"lt":           Lt,
+		"le":           Le,
+		"dict":         Dictionary,
+		"in":           In,
+		"slicestr":     Slicestr,
+		"substr":       Substr,
+		"split":        Split,
+		"intersect":    Intersect,
+		"isSet":        IsSet,
+		"isset":        IsSet,
+		"echoParam":    ReturnWhenSet,
+		"safeHTML":     SafeHTML,
+		"safeCSS":      SafeCSS,
+		"safeJS":       SafeJS,
+		"safeURL":      SafeURL,
+		"absURL":       func(a string) template.HTML { return template.HTML(helpers.AbsURL(a)) },
+		"relURL":       func(a string) template.HTML { return template.HTML(helpers.RelURL(a)) },
+		"markdownify":  Markdownify,
+		"first":        First,
+		"last":         Last,
+		"after":        After,
+		"where":        Where,
+		"delimit":      Delimit,
+		"sort":         Sort,
+		"highlight":    Highlight,
+		"add":          func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '+') },
+		"sub":          func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '-') },
+		"div":          func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '/') },
+		"mod":          Mod,
+		"mul":          func(a, b interface{}) (interface{}, error) { return doArithmetic(a, b, '*') },
+		"modBool":      ModBool,
+		"lower":        func(a string) string { return strings.ToLower(a) },
+		"upper":        func(a string) string { return strings.ToUpper(a) },
+		"title":        func(a string) string { return strings.Title(a) },
+		"partial":      Partial,
+		"ref":          Ref,
+		"relref":       RelRef,
+		"apply":        Apply,
+		"chomp":        Chomp,
+		"replace":      Replace,
+		"trim":         Trim,
+		"dateFormat":   DateFormat,
+		"getJSON":      GetJSON,
+		"getCSV":       GetCSV,
+		"readDir":      ReadDir,
+		"seq":          helpers.Seq,
+		"getenv":       func(varName string) string { return os.Getenv(varName) },
+		"base64Decode": Base64Decode,
+		"base64Encode": Base64Encode,
+		"pluralize": func(in interface{}) (string, error) {
+			word, err := cast.ToStringE(in)
+			if err != nil {
+				return "", err
+			}
+			return inflect.Pluralize(word), nil
+		},
+		"singularize": func(in interface{}) (string, error) {
+			word, err := cast.ToStringE(in)
+			if err != nil {
+				return "", err
+			}
+			return inflect.Singularize(word), nil
+		},
+	}
 }

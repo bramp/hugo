@@ -37,6 +37,7 @@ The new site will have the following structure
 
       ▸ archetypes/
       ▸ content/
+      ▸ data/
       ▸ layouts/
       ▸ static/
         config.toml
@@ -44,6 +45,9 @@ The new site will have the following structure
 Currently the site doesn’t have any content, nor is it configured.
 
 ## Step 3. Create Some Content
+
+> If you used a different blogging platform such as Jekyll, Ghost or Wordpress and you
+want convert your content, take a look at this list of [ migration tools]({{< relref "tools/index.md#migration-tools" >}}).
 
 Hugo also has the ability to create a skeleton content page:
 
@@ -83,10 +87,10 @@ We still lack any templates to tell us how to display the content.
 ## Step 4. Install some themes
 
 Hugo has rich theme support and a growing set of themes to choose from.
-To install all of the available Hugo themes, simply clone the entire **hugoThemes** repository from within your working directory:
+To install the latest version of all of the available Hugo themes, simply clone the entire **hugoThemes** repository from within your working directory:
 
 ```bash
-$ git clone --recursive https://github.com/spf13/hugoThemes themes
+$ git clone --depth 1 --recursive https://github.com/spf13/hugoThemes.git themes
 ```
 
 ## Step 5. Run Hugo
@@ -96,12 +100,16 @@ server` and Hugo will find an available port and run a server with
 your content:
 
     $ hugo server --theme=hyde --buildDrafts
+    2 of 2 drafts rendered
+    0 future content
     2 pages created
+    0 paginator pages created
     0 tags created
     0 categories created
-    in 5 ms
-    Serving pages from exampleHugoSite/public
-    Web Server is available at http://localhost:1313
+    in 15 ms
+    Watching for changes in /home/user/exampleHugoSite/{data,content,layouts,static,themes}
+    Serving pages from memory
+    Web Server is available at http://localhost:1313/ (bind address 127.0.0.1)
     Press Ctrl+C to stop
 
 We specified two options here:
@@ -126,7 +134,7 @@ This even works in mobile browsers.
 
 Stop the Hugo process by hitting <kbd>Ctrl</kbd>+<kbd>C</kbd>. Then run the following:
 
-    $ hugo server --theme=hyde --buildDrafts --watch
+    $ hugo server --theme=hyde --buildDrafts
     2 pages created
     0 tags created
     0 categories created
@@ -146,11 +154,14 @@ you can look at the browser in most cases.
 Change and save this file. Notice what happened in your terminal:
 
     Change detected, rebuilding site
-
+    2015-11-27 15:13 +0100
+    2 of 2 drafts rendered
+    0 future content
     2 pages created
+    0 paginator pages created
     0 tags created
     0 categories created
-    in 5 ms
+    in 11 ms
 
 ## Step 7. Have fun
 

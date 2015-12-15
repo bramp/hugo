@@ -74,7 +74,7 @@ Following is a list of Hugo-defined variables that you can configure and their c
 
     ---
     archetypedir:               "archetype"
-    # hostname (and path) to the root eg. http://spf13.com/
+    # hostname (and path) to the root, e.g. http://spf13.com/
     baseURL:                    ""
     # include content marked as draft
     buildDrafts:                false
@@ -115,7 +115,9 @@ Following is a list of Hugo-defined variables that you can configure and their c
     paginatePath:               "page"
     permalinks:
     # Pluralize titles in lists using inflect
-    pluralizeListTitles:         true
+    pluralizeListTitles:        true
+    # Preserve special characters in taxonomy names ("Gérard Depardieu" vs "Gerard Depardieu")
+    preserveTaxonomyNames:      false
     publishdir:                 "public"
     # color-codes for highlighting derived from this style
     pygmentsStyle:              "monokai"
@@ -135,6 +137,8 @@ Following is a list of Hugo-defined variables that you can configure and their c
     uglyURLs:                   false
     # Do not make the url/path to lowercase
     disablePathToLower:         false
+    # if true, auto-detect Chinese/Janapese/Korean Languages in the content. (.Summary and .WordCount can work properly in CJKLanguage)
+    hasCJKLanguage              false
     # verbose output
     verbose:                    false
     # verbose logging
@@ -177,7 +181,7 @@ But Hugo does expose some options---as listed in the table below, matched with t
 <tr>
 <td class="purpose-title">Purpose:</td>
 <td class="purpose-description" colspan="2">Enable/Disable smart punctuation substitutions such as smart quotes, smart dashes, etc.
-May be fine-tuned with the <code>angledQuotes</code>, <code>fractions</code> and <code>latexDashes</code> flags below.</td>
+May be fine-tuned with the <code>angledQuotes</code>, <code>fractions</code>, <code>smartDashes</code> and <code>latexDashes</code> flags below.</td>
 </tr>
 
 <tr>
@@ -207,6 +211,17 @@ but only these three.</small></td>
 </tr>
 
 <tr>
+<td><code><strong>smartDashes</strong></code></td>
+<td><code>true</code></td>
+<td><code>HTML_SMARTYPANTS_DASHES</code></td>
+</tr>
+<tr>
+<td class="purpose-title">Purpose:</td>
+<td class="purpose-description" colspan="2">Enable/Disable smart dashes, i.e. turning hyphens into en&nbsp;dash or em&nbsp;dash.<br>
+Its behavior can be modified with the <code>latexDashes</code> flag listed below.</td>
+</tr>
+
+<tr>
 <td><code><strong>latexDashes</strong></code></td>
 <td><code>true</code></td>
 <td><code>HTML_SMARTYPANTS_LATEX_DASHES</code></td>
@@ -231,7 +246,7 @@ but only these three.</small></td>
 </tr>
 
 <tr>
-<td><code><strong>plainIdAnchors</strong></code></td>
+<td><code><strong>plainIDAnchors</strong></code></td>
 <td><code>false</code></td>
 <td><code>FootnoteAnchorPrefix</code> and <code>HeaderIDSuffix</code></td>
 </tr>
@@ -268,7 +283,10 @@ but only these three.</small></td>
 </table>
 
 
-**Note** that these flags must be grouped under the `blackfriday` key and can be set on **both site and page level**. If set on page, it will override the site setting.  Example:
+**Notes**
+
+1. These flags are **very case-sensitive** (as of Hugo v0.15)!
+2. These flags must be grouped under the `blackfriday` key and can be set on **both site and page level**. If set on page, it will override the site setting.  Example:
 
 <table class="table">
 <thead>
@@ -281,22 +299,16 @@ but only these three.</small></td>
 <td style="width: 50%;"><pre><code>[blackfriday]
   angledQuotes = true
   fractions = false
-  plainIdAnchors = true
+  plainIDAnchors = true
   extensions = ["hardLineBreak"]
 </code></pre></td>
 <td><pre><code>blackfriday:
   angledQuotes: true
   fractions: false
-  plainIdAnchors: true
+  plainIDAnchors: true
   extensions:
     - hardLineBreak
 </code></pre></td>
 </tr>
 </tbody>
 </table>
-
-## Notes
-
-Config changes are not reflected with [LiveReload](/extras/livereload/).
-
-Please restart `hugo server --watch` whenever you make a config change.

@@ -1,9 +1,24 @@
+// Copyright 2015 The Hugo Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package tpl
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/spf13/cast"
 	"html/template"
 	"path"
 	"reflect"
@@ -80,6 +95,9 @@ func doTestCompare(t *testing.T, tp tstCompareType, funcUnderTest func(a, b inte
 		{"8", "5", 1},
 		{"5", "0001", 1},
 		{[]int{100, 99}, []int{1, 2, 3, 4}, -1},
+		{cast.ToTime("2015-11-20"), cast.ToTime("2015-11-20"), 0},
+		{cast.ToTime("2015-11-19"), cast.ToTime("2015-11-20"), -1},
+		{cast.ToTime("2015-11-20"), cast.ToTime("2015-11-19"), 1},
 	} {
 		result := funcUnderTest(this.left, this.right)
 		success := false
@@ -323,6 +341,29 @@ func TestAfter(t *testing.T) {
 	}
 }
 
+func TestDictionary(t *testing.T) {
+	for i, this := range []struct {
+		v1            []interface{}
+		expecterr     bool
+		expectedValue map[string]interface{}
+	}{
+		{[]interface{}{"a", "b"}, false, map[string]interface{}{"a": "b"}},
+		{[]interface{}{5, "b"}, true, nil},
+		{[]interface{}{"a", 12, "b", []int{4}}, false, map[string]interface{}{"a": 12, "b": []int{4}}},
+		{[]interface{}{"a", "b", "c"}, true, nil},
+	} {
+		r, e := Dictionary(this.v1...)
+
+		if (this.expecterr && e == nil) || (!this.expecterr && e != nil) {
+			t.Errorf("[%d] got an unexpected error: %s", i, e)
+		} else if !this.expecterr {
+			if !reflect.DeepEqual(r, this.expectedValue) {
+				t.Errorf("[%d] got %v but expected %v", i, r, this.expectedValue)
+			}
+		}
+	}
+}
+
 func TestIn(t *testing.T) {
 	for i, this := range []struct {
 		v1     interface{}
@@ -330,9 +371,14 @@ func TestIn(t *testing.T) {
 		expect bool
 	}{
 		{[]string{"a", "b", "c"}, "b", true},
+		{[]interface{}{"a", "b", "c"}, "b", true},
+		{[]interface{}{"a", "b", "c"}, "d", false},
 		{[]string{"a", "b", "c"}, "d", false},
 		{[]string{"a", "12", "c"}, 12, false},
 		{[]int{1, 2, 4}, 2, true},
+		{[]interface{}{1, 2, 4}, 2, true},
+		{[]interface{}{1, 2, 4}, nil, false},
+		{[]interface{}{nil}, nil, false},
 		{[]int{1, 2, 4}, 3, false},
 		{[]float64{1.23, 2.45, 4.67}, 1.23, true},
 		{[]float64{1.234567, 2.45, 4.67}, 1.234568, false},
@@ -694,6 +740,7 @@ func TestCheckCondition(t *testing.T) {
 			"",
 			expect{true, false},
 		},
+		{reflect.ValueOf(true), reflect.ValueOf(true), "", expect{true, false}},
 		{reflect.ValueOf(nil), reflect.ValueOf(nil), "", expect{true, false}},
 		{reflect.ValueOf(123), reflect.ValueOf(456), "!=", expect{true, false}},
 		{reflect.ValueOf("foo"), reflect.ValueOf("bar"), "!=", expect{true, false}},
@@ -703,6 +750,7 @@ func TestCheckCondition(t *testing.T) {
 			"!=",
 			expect{true, false},
 		},
+		{reflect.ValueOf(true), reflect.ValueOf(false), "!=", expect{true, false}},
 		{reflect.ValueOf(123), reflect.ValueOf(nil), "!=", expect{true, false}},
 		{reflect.ValueOf(456), reflect.ValueOf(123), ">=", expect{true, false}},
 		{reflect.ValueOf("foo"), reflect.ValueOf("bar"), ">=", expect{true, false}},
@@ -766,8 +814,12 @@ func TestCheckCondition(t *testing.T) {
 		{reflect.ValueOf("foo"), reflect.Value{}, "", expect{false, false}},
 		{reflect.ValueOf((*TstX)(nil)), reflect.ValueOf("foo"), "", expect{false, false}},
 		{reflect.ValueOf("foo"), reflect.ValueOf((*TstX)(nil)), "", expect{false, false}},
+		{reflect.ValueOf(true), reflect.ValueOf("foo"), "", expect{false, false}},
+		{reflect.ValueOf("foo"), reflect.ValueOf(true), "", expect{false, false}},
 		{reflect.ValueOf("foo"), reflect.ValueOf(map[int]string{}), "", expect{false, false}},
 		{reflect.ValueOf("foo"), reflect.ValueOf([]int{1, 2}), "", expect{false, false}},
+		{reflect.ValueOf((*TstX)(nil)), reflect.ValueOf((*TstX)(nil)), ">", expect{false, false}},
+		{reflect.ValueOf(true), reflect.ValueOf(false), ">", expect{false, false}},
 		{reflect.ValueOf(123), reflect.ValueOf([]int{}), "in", expect{false, false}},
 		{reflect.ValueOf(123), reflect.ValueOf(123), "op", expect{false, true}},
 	} {
@@ -990,6 +1042,31 @@ func TestWhere(t *testing.T) {
 			},
 			key: "b", op: ">", match: nil,
 			expect: []map[string]int{},
+		},
+		{
+			sequence: []map[string]bool{
+				{"a": true, "b": false}, {"c": true, "b": true}, {"d": true, "b": false},
+			},
+			key: "b", op: "", match: true,
+			expect: []map[string]bool{
+				{"c": true, "b": true},
+			},
+		},
+		{
+			sequence: []map[string]bool{
+				{"a": true, "b": false}, {"c": true, "b": true}, {"d": true, "b": false},
+			},
+			key: "b", op: "!=", match: true,
+			expect: []map[string]bool{
+				{"a": true, "b": false}, {"d": true, "b": false},
+			},
+		},
+		{
+			sequence: []map[string]bool{
+				{"a": true, "b": false}, {"c": true, "b": true}, {"d": true, "b": false},
+			},
+			key: "b", op: ">", match: false,
+			expect: []map[string]bool{},
 		},
 		{sequence: (*[]TstX)(nil), key: "A", match: "a", expect: false},
 		{sequence: TstX{A: "a", B: "b"}, key: "A", match: "a", expect: false},
@@ -1547,6 +1624,41 @@ func TestSafeCSS(t *testing.T) {
 	}
 }
 
+func TestSafeJS(t *testing.T) {
+	for i, this := range []struct {
+		str                 string
+		tmplStr             string
+		expectWithoutEscape string
+		expectWithEscape    string
+	}{
+		{`619c16f`, `<script>var x{{ . }};</script>`, `<script>var x"619c16f";</script>`, `<script>var x619c16f;</script>`},
+	} {
+		tmpl, err := template.New("test").Parse(this.tmplStr)
+		if err != nil {
+			t.Errorf("[%d] unable to create new html template %q: %s", i, this.tmplStr, err)
+			continue
+		}
+
+		buf := new(bytes.Buffer)
+		err = tmpl.Execute(buf, this.str)
+		if err != nil {
+			t.Errorf("[%d] execute template with a raw string value returns unexpected error: %s", i, err)
+		}
+		if buf.String() != this.expectWithoutEscape {
+			t.Errorf("[%d] execute template with a raw string value, got %v but expected %v", i, buf.String(), this.expectWithoutEscape)
+		}
+
+		buf.Reset()
+		err = tmpl.Execute(buf, SafeJS(this.str))
+		if err != nil {
+			t.Errorf("[%d] execute template with an escaped string value by SafeJS returns unexpected error: %s", i, err)
+		}
+		if buf.String() != this.expectWithEscape {
+			t.Errorf("[%d] execute template with an escaped string value by SafeJS, got %v but expected %v", i, buf.String(), this.expectWithEscape)
+		}
+	}
+}
+
 func TestSafeURL(t *testing.T) {
 	for i, this := range []struct {
 		str                 string
@@ -1579,5 +1691,38 @@ func TestSafeURL(t *testing.T) {
 		if buf.String() != this.expectWithEscape {
 			t.Errorf("[%d] execute template with an escaped string value by SafeURL, got %v but expected %v", i, buf.String(), this.expectWithEscape)
 		}
+	}
+}
+
+func TestBase64Decode(t *testing.T) {
+	testStr := "abc123!?$*&()'-=@~"
+	enc := base64.StdEncoding.EncodeToString([]byte(testStr))
+	result, err := Base64Decode(enc)
+
+	if err != nil {
+		t.Error("Base64Decode:", err)
+	}
+
+	if result != testStr {
+		t.Errorf("Base64Decode: got '%s', expected '%s'", result, testStr)
+	}
+}
+
+func TestBase64Encode(t *testing.T) {
+	testStr := "YWJjMTIzIT8kKiYoKSctPUB+"
+	dec, err := base64.StdEncoding.DecodeString(testStr)
+
+	if err != nil {
+		t.Error("Base64Encode: the DecodeString function of the base64 package returned an error.", err)
+	}
+
+	result, err := Base64Encode(string(dec))
+
+	if err != nil {
+		t.Errorf("Base64Encode: Can't cast arg '%s' into a string.", testStr)
+	}
+
+	if result != testStr {
+		t.Errorf("Base64Encode: got '%s', expected '%s'", result, testStr)
 	}
 }

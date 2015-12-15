@@ -50,6 +50,29 @@ e.g.
 
     // Outputs Tags: tag1, tag2 and tag3
 
+### dict
+Creates a dictionary (map[string, interface{}), expects parameters added in value:object fasion.
+Invalid combinations like keys that are not strings or uneven number of parameters, will result in an exception thrown
+Useful for passing maps to partials when adding to a template.
+
+e.g. Pass into "foo.html" a map with the keys "important, content" 
+
+    {{$important := .Site.Params.SomethingImportant }}
+    {{range .Site.Params.Bar}}
+        {{partial "foo" (dict "content" . "important" $important)}}
+    {{end}}
+
+"foo.html"
+
+    Important {{.important}}
+    {{.content}}
+    
+
+or Create a map on the fly to pass into 
+
+    {{partial "foo" (dict "important" "Smiles" "content" "You should do more")}}
+    
+
 
 ### echoParam
 Prints a parameter if it is set.
@@ -138,7 +161,7 @@ e.g.
     <ul>
     {{ $page_link := .Permalink }}
     {{ $tags := .Params.tags }}
-    {{ range .Site.Recent }}
+    {{ range .Site.Pages }}
         {{ $page := . }}
         {{ $has_common_tags := intersect $tags .Params.tags | len | lt 0 }}
         {{ if and $has_common_tags (ne $page_link $page.Permalink) }}
@@ -236,7 +259,7 @@ e.g.
     series: golang
     +++
 
-    {{ range where .Site.Recent "Params.series" "golang" }}
+    {{ range where .Site.Pages "Params.series" "golang" }}
        {{ .Content }}
     {{ end }}
 
@@ -339,7 +362,7 @@ e.g.
 ### chomp
 Removes any trailing newline characters. Useful in a pipeline to remove newlines added by other processing (including `markdownify`).
 
-e.g., `{{chomp "<p>Blockhead</p>\n"` → `"<p>Blockhead</p>"`
+e.g., `{{chomp "<p>Blockhead</p>\n"}}` → `"<p>Blockhead</p>"`
 
 
 ### dateFormat
@@ -362,10 +385,14 @@ e.g. `{{lower "BatMan"}}` → "batman"
 
 ### markdownify
 
-Runs the string through the Markdown processesor. The result will be declared as "safe" so Go templates will not filter it.
+Runs the string through the Markdown processor. The result will be declared as "safe" so Go templates will not filter it.
 
 e.g. `{{ .Title | markdownify }}`
 
+### pluralize
+Pluralize the given word with a set of common English pluralization rules.
+
+e.g. `{{ "cat" | pluralize }}` → "cats"
 
 ### replace
 Replaces all occurrences of the search string with the replacement string.
@@ -428,6 +455,26 @@ Example: Given `style = "color: red;"` defined in the front matter of your `.md`
 
 Note: "ZgotmplZ" is a special value that indicates that unsafe content reached a
 CSS or URL context.
+
+### safeJS
+
+Declares the provided string as a known "safe" Javascript string so Go
+html/templates will not escape it.  "Safe" means the string encapsulates a known
+safe EcmaScript5 Expression, for example, `(x + y * z())`. Template authors
+are responsible for ensuring that typed expressions do not break the intended
+precedence and that there is no statement/expression ambiguity as when passing
+an expression like `{ foo:bar() }\n['foo']()`, which is both a valid Expression
+and a valid Program with a very different meaning.
+
+Example: Given `hash = "619c16f"` defined in the front matter of your `.md` file:
+
+* `<script>var form_{{ .Params.hash | safeJS }};…</script>` ⇒ `<script>var form_619c16f;…</script>` (Good!)
+* `<script>var form_{{ .Params.hash }};…</script>` ⇒ `<script>var form_"619c16f";…</script>` (Bad!)
+
+### singularize
+Singularize the given word with a set of common English singularization rules.
+
+e.g. `{{ "cats" | singularize }}` → "cat"
 
 ### slicestr
 
@@ -641,3 +688,31 @@ In this version, we are now sorting the tags, converting them to links with "pos
     {{ end }}
 
 `apply` does not work when receiving the sequence as an argument through a pipeline.
+
+***
+
+### base64Encode and base64Decode
+
+`base64Encode` and `base64Decode` let you easily decode content with a base64 encoding and vice versa through pipes. Let's take a look at an example:
+
+
+    {{ "Hello world" | base64Encode }}
+    <!-- will output "SGVsbG8gd29ybGQ=" and -->
+
+    {{ "SGVsbG8gd29ybGQ=" | base64Decode }}
+    <!-- becomes "Hello world" again. -->
+
+You can also pass other datatypes as argument to the template function which tries
+to convert them. Now we use an integer instead of a string:
+
+
+    {{ 42 | base64Encode | base64Decode }}
+    <!-- will output "42". Both functions always return a string. -->
+
+**Tip:** Using base64 to decode and encode becomes really powerful if we have to handle
+responses of APIs.
+
+    {{ $resp := getJSON "https://api.github.com/repos/spf13/hugo/readme"  }}
+    {{ $resp.content | base64Decode | markdownify }}
+
+The response of the GitHub API contains the base64-encoded version of the [README.md](https://github.com/spf13/hugo/blob/master/README.md) in the Hugo repository. Now we can decode it and parse the Markdown. The final output will look similar to the rendered version on GitHub.

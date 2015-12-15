@@ -1,3 +1,16 @@
+// Copyright 2015 The Hugo Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package hugolib
 
 import (
@@ -279,26 +292,26 @@ func TestDraftAndFutureRender(t *testing.T) {
 // Issue #957
 func TestCrossrefs(t *testing.T) {
 	hugofs.DestinationFS = new(afero.MemMapFs)
-	for _, uglyUrls := range []bool{true, false} {
+	for _, uglyURLs := range []bool{true, false} {
 		for _, relative := range []bool{true, false} {
-			doTestCrossrefs(t, relative, uglyUrls)
+			doTestCrossrefs(t, relative, uglyURLs)
 		}
 	}
 }
 
-func doTestCrossrefs(t *testing.T, relative, uglyUrls bool) {
+func doTestCrossrefs(t *testing.T, relative, uglyURLs bool) {
 	viper.Reset()
 	defer viper.Reset()
 
-	baseUrl := "http://foo/bar"
+	baseURL := "http://foo/bar"
 	viper.Set("DefaultExtension", "html")
-	viper.Set("baseurl", baseUrl)
-	viper.Set("UglyURLs", uglyUrls)
+	viper.Set("baseurl", baseURL)
+	viper.Set("UglyURLs", uglyURLs)
 	viper.Set("verbose", true)
 
 	var refShortcode string
 	var expectedBase string
-	var expectedUrlSuffix string
+	var expectedURLSuffix string
 	var expectedPathSuffix string
 
 	if relative {
@@ -306,14 +319,14 @@ func doTestCrossrefs(t *testing.T, relative, uglyUrls bool) {
 		expectedBase = "/bar"
 	} else {
 		refShortcode = "ref"
-		expectedBase = baseUrl
+		expectedBase = baseURL
 	}
 
-	if uglyUrls {
-		expectedUrlSuffix = ".html"
+	if uglyURLs {
+		expectedURLSuffix = ".html"
 		expectedPathSuffix = ".html"
 	} else {
-		expectedUrlSuffix = "/"
+		expectedURLSuffix = "/"
 		expectedPathSuffix = "/index.html"
 	}
 
@@ -331,7 +344,7 @@ THE END.`, refShortcode))},
 
 	s := &Site{
 		Source:  &source.InMemorySource{ByteSource: sources},
-		Targets: targetList{Page: &target.PagePub{UglyURLs: uglyUrls}},
+		Targets: targetList{Page: &target.PagePub{UglyURLs: uglyURLs}},
 	}
 
 	s.initializeSiteInfo()
@@ -345,8 +358,8 @@ THE END.`, refShortcode))},
 		doc      string
 		expected string
 	}{
-		{filepath.FromSlash(fmt.Sprintf("sect/doc1%s", expectedPathSuffix)), fmt.Sprintf("<p>Ref 2: %s/sect/doc2%s</p>\n", expectedBase, expectedUrlSuffix)},
-		{filepath.FromSlash(fmt.Sprintf("sect/doc2%s", expectedPathSuffix)), fmt.Sprintf("<p><strong>Ref 1:</strong></p>\n\n%s/sect/doc1%s\n\n<p>THE END.</p>\n", expectedBase, expectedUrlSuffix)},
+		{filepath.FromSlash(fmt.Sprintf("sect/doc1%s", expectedPathSuffix)), fmt.Sprintf("<p>Ref 2: %s/sect/doc2%s</p>\n", expectedBase, expectedURLSuffix)},
+		{filepath.FromSlash(fmt.Sprintf("sect/doc2%s", expectedPathSuffix)), fmt.Sprintf("<p><strong>Ref 1:</strong></p>\n\n%s/sect/doc1%s\n\n<p>THE END.</p>\n", expectedBase, expectedURLSuffix)},
 	}
 
 	for _, test := range tests {
@@ -366,14 +379,14 @@ THE END.`, refShortcode))},
 }
 
 // Issue #939
-func Test404ShouldAlwaysHaveUglyUrls(t *testing.T) {
+func Test404ShouldAlwaysHaveUglyURLs(t *testing.T) {
 	hugofs.DestinationFS = new(afero.MemMapFs)
 	for _, uglyURLs := range []bool{true, false} {
-		doTest404ShouldAlwaysHaveUglyUrls(t, uglyURLs)
+		doTest404ShouldAlwaysHaveUglyURLs(t, uglyURLs)
 	}
 }
 
-func doTest404ShouldAlwaysHaveUglyUrls(t *testing.T, uglyURLs bool) {
+func doTest404ShouldAlwaysHaveUglyURLs(t *testing.T, uglyURLs bool) {
 	viper.Reset()
 	defer viper.Reset()
 
@@ -590,7 +603,7 @@ func TestSkipRender(t *testing.T) {
 	}
 }
 
-func TestAbsUrlify(t *testing.T) {
+func TestAbsURLify(t *testing.T) {
 	viper.Reset()
 	defer viper.Reset()
 
@@ -648,7 +661,7 @@ func TestAbsUrlify(t *testing.T) {
 			}
 
 			if content != expected {
-				t.Errorf("AbsUrlify content expected:\n%q\ngot\n%q", expected, content)
+				t.Errorf("AbsURLify content expected:\n%q\ngot\n%q", expected, content)
 			}
 		}
 	}
